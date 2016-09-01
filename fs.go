@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ipfs/go-ipfs-api"
+	go_ipfs_api "github.com/ipfs/go-ipfs-api"
 
 	"github.com/kpmy/mipfs/ipfs_api"
 	. "github.com/kpmy/ypk/tc"

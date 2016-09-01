@@ -3,7 +3,7 @@ package ipfs_api
 import (
 	"log"
 
-	"github.com/ipfs/go-ipfs-api"
+	go_ipfs_api "github.com/ipfs/go-ipfs-api"
 )
 
 var sh *go_ipfs_api.Shell
