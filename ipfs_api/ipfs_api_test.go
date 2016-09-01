@@ -5,11 +5,11 @@ import (
 
 	"net/http"
 
-	ipfs "github.com/ipfs/go-ipfs-api"
+	"github.com/ipfs/go-ipfs-api"
 )
 
 func TestShell(t *testing.T) {
-	sh := ipfs.NewShellWithClient("127.0.0.1:5001", http.DefaultClient)
+	sh := go_ipfs_api.NewShellWithClient("127.0.0.1:5001", http.DefaultClient)
 	id, _ := sh.ID()
 	t.Log(id)
 	root, _ := sh.Resolve("/ipns/" + id.ID)
