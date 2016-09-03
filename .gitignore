@@ -25,3 +25,4 @@ _testmain.go
 *.iml
 *.ipr
 *.iws
+.memo
