@@ -6,9 +6,13 @@ import (
 
 	go_ipfs_api "github.com/ipfs/go-ipfs-api"
 
+	"fmt"
 	"github.com/kpmy/mipfs/ipfs_api"
 	. "github.com/kpmy/ypk/tc"
 	"golang.org/x/net/webdav"
+	"path/filepath"
+	"strings"
+	"sync"
 )
 
 type file struct {
@@ -162,9 +166,32 @@ type filesystem struct {
 	root string
 }
 
-func (f *filesystem) Mkdir(name string, perm os.FileMode) error {
+func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
 	Assert(name != "", 20)
-	panic(100)
+	ls := split(f.root, name)
+	ns := strings.Split(f.root+name, "/")
+	downHash := ""
+	downPath := ""
+	for i := len(ns) - 1; i >= 0; i-- {
+		newHash := ""
+		if i >= len(ls) {
+			newHash, _ = ipfs_api.Shell().NewObject("unixfs-dir")
+		} else {
+			newHash = ls[i].Hash
+		}
+		if downHash != "" {
+			newHash, _ = ipfs_api.Shell().PatchLink(newHash, downPath, downHash, false)
+		}
+		downHash = newHash
+		downPath = ns[i]
+		if i == 0 {
+			ipfs_api.Shell().Unpin(f.root)
+			f.root = newHash
+			ipfs_api.Shell().Pin(f.root)
+			memo.Write("root", []byte(f.root))
+		}
+	}
+	return
 }
 
 func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (webdav.File, error) {
@@ -177,8 +204,36 @@ func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (webdav.F
 	}
 }
 
-func (f *filesystem) RemoveAll(name string) error {
-	panic(100)
+func (f *filesystem) RemoveAll(name string) (err error) {
+	var ls []*loc
+	var ns []string
+	var newHash string
+	if li, fi := trav(f.root, name); fi != nil {
+		ls = split(f.root, filepath.Dir(name))
+		ns = strings.Split(f.root+filepath.Dir(name), "/")
+		_, fn := filepath.Split(name)
+		newHash, _ = ipfs_api.Shell().Patch(ls[len(ls)-1].Hash, "rm-link", fn)
+		if j := len(ls) - 2; j > 0 {
+			newHash, _ = ipfs_api.Shell().Patch(ls[len(ls)-2].Hash, "rm-link", ns[len(ns)-1])
+		}
+	} else if li != nil {
+		ls = split(f.root, name)
+		ns = strings.Split(f.root+name, "/")
+		newHash, _ = ipfs_api.Shell().Patch(ls[len(ls)-2].Hash, "rm-link", ns[len(ns)-1])
+		Assert(len(ls) > 1 && len(ns) > 1 && len(ls) == len(ns), 20)
+	} else {
+		panic(0)
+	}
+	if j := len(ls) - 2; j > 0 {
+		for i := j - 1; i >= 0; i-- {
+			newHash, _ = ipfs_api.Shell().PatchLink(ls[i].Hash, ns[i+1], newHash, false)
+		}
+	}
+	ipfs_api.Shell().Unpin(f.root)
+	f.root = newHash
+	ipfs_api.Shell().Pin(f.root)
+	memo.Write("root", []byte(f.root))
+	return
 }
 
 func (f *filesystem) Rename(oldName, newName string) error {
@@ -204,10 +259,18 @@ func init() {
 func NewFS() webdav.FileSystem {
 	//root, _ := ipfs.Shell().Resolve(nodeID.ID)
 	root := "QmbuSdtGUUfL7DSvvA9DmiGSRqAzkHEjWtsxZDRPBWcawg"
+	if r, err := memo.Read("root"); err == nil {
+		root = string(r)
+	} else {
+		memo.Write("root", []byte(root))
+	}
 	return &filesystem{node: nodeID.ID, root: root}
 }
 
 type locksystem struct {
+	sync.RWMutex
+	locks  map[string]string
+	tokens map[string]webdav.LockDetails
 }
 
 func (l *locksystem) Confirm(now time.Time, name0, name1 string, conditions ...webdav.Condition) (release func(), err error) {
@@ -215,17 +278,37 @@ func (l *locksystem) Confirm(now time.Time, name0, name1 string, conditions ...w
 }
 
 func (l *locksystem) Create(now time.Time, details webdav.LockDetails) (token string, err error) {
-	panic(100)
+	l.RLock()
+	if _, ok := l.locks[details.Root]; !ok {
+		l.RUnlock()
+		l.Lock()
+		token = fmt.Sprint(now.UnixNano())
+		l.locks[details.Root] = token
+		l.tokens[token] = details
+		l.RWMutex.Unlock()
+	} else {
+		l.RUnlock()
+		err = webdav.ErrLocked
+	}
+	return
 }
 
 func (l *locksystem) Refresh(now time.Time, token string, duration time.Duration) (webdav.LockDetails, error) {
 	panic(100)
 }
 
-func (l *locksystem) Unlock(now time.Time, token string) error {
-	panic(100)
+func (l *locksystem) Unlock(now time.Time, token string) (err error) {
+	l.Lock()
+	details := l.tokens[token]
+	delete(l.tokens, token)
+	delete(l.locks, details.Root)
+	l.RWMutex.Unlock()
+	return
 }
 
 func NewLS() webdav.LockSystem {
-	return &locksystem{}
+	ret := &locksystem{}
+	ret.locks = make(map[string]string)
+	ret.tokens = make(map[string]webdav.LockDetails)
+	return ret
 }
