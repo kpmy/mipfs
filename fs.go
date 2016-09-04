@@ -1,22 +1,28 @@
 package mipfs
 
 import (
+	"io"
 	"os"
 	"time"
 
 	go_ipfs_api "github.com/ipfs/go-ipfs-api"
 
 	"fmt"
-	"github.com/kpmy/mipfs/ipfs_api"
-	. "github.com/kpmy/ypk/tc"
-	"golang.org/x/net/webdav"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/kpmy/mipfs/ipfs_api"
+	. "github.com/kpmy/ypk/tc"
+	"github.com/mattetti/filebuffer"
+	"golang.org/x/net/webdav"
 )
 
 type file struct {
 	go_ipfs_api.UnixLsLink
+	pos   int64
+	buf   *filebuffer.Buffer
+	links []*go_ipfs_api.LsLink
 }
 
 func (f *file) Name() string {
@@ -47,11 +53,54 @@ func (f *file) Close() error {
 }
 
 func (f *file) Read(p []byte) (n int, err error) {
-	panic(100)
+	if f.links == nil {
+		f.links, _ = ipfs_api.Shell().List(f.Hash)
+	}
+	if len(f.links) == 0 {
+		buf := filebuffer.New(nil)
+		rd, _ := ipfs_api.Shell().Cat(f.Hash)
+		io.Copy(buf, rd)
+		buf.Seek(f.pos, io.SeekStart)
+		return buf.Read(p)
+	} else {
+		var end int64 = 0
+		for _, l := range f.links {
+			begin := end
+			end = begin + int64(l.Size)
+			if begin <= f.pos && f.pos < end {
+				if f.buf == nil {
+					rd, _ := ipfs_api.Shell().Cat(l.Hash)
+					f.buf = filebuffer.New(nil)
+					io.Copy(f.buf, rd)
+					l.Size = uint64(f.buf.Buff.Len())
+				}
+				f.buf.Seek(f.pos-begin, io.SeekStart)
+				n, err = f.buf.Read(p)
+				f.pos = f.pos + int64(n)
+				if f.buf.Index == int64(l.Size) {
+					f.buf = nil
+				}
+				return
+			}
+		}
+		panic(100)
+	}
 }
 
-func (f *file) Seek(offset int64, whence int) (int64, error) {
-	panic(100)
+func (f *file) Seek(offset int64, whence int) (seek int64, err error) {
+	switch whence {
+	case io.SeekStart:
+		f.pos = offset
+	case io.SeekCurrent:
+		f.pos = f.pos + offset
+	case io.SeekEnd:
+		f.pos = f.Size() + offset
+	default:
+		Halt(100)
+	}
+	Assert(f.pos >= 0, 60)
+	seek = f.pos
+	return
 }
 
 func (f *file) Readdir(count int) (ret []os.FileInfo, err error) {
@@ -196,7 +245,7 @@ func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
 
 func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (webdav.File, error) {
 	if li, fi := trav(f.root, name); fi != nil {
-		return &file{fi.UnixLsLink}, nil
+		return &file{UnixLsLink: fi.UnixLsLink}, nil
 	} else if li != nil {
 		return li, nil
 	} else {
