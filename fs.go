@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ipfs/go-ipfs/commands/http"
 	"github.com/kpmy/mipfs/ipfs_api"
 	. "github.com/kpmy/ypk/tc"
 	"github.com/mattetti/filebuffer"
@@ -23,6 +24,7 @@ type file struct {
 	pos   int64
 	buf   *filebuffer.Buffer
 	links []*go_ipfs_api.LsLink
+	newFn func(io.ReadCloser)
 }
 
 func (f *file) Name() string {
@@ -112,7 +114,14 @@ func (f *file) Stat() (os.FileInfo, error) {
 }
 
 func (f *file) Write(p []byte) (n int, err error) {
-	panic(100)
+	if f.newFn != nil {
+		buf := filebuffer.New(p)
+		f.newFn(buf)
+		f.pos = buf.Index
+		return int(f.pos), nil
+	} else {
+		panic(100)
+	}
 }
 
 type link struct {
@@ -211,6 +220,7 @@ func (l *loc) Write(p []byte) (n int, err error) {
 }
 
 type filesystem struct {
+	webdav.FileSystem
 	node string
 	root string
 }
@@ -249,8 +259,40 @@ func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (webdav.F
 	} else if li != nil {
 		return li, nil
 	} else {
-		panic(0)
+		switch {
+		case flag&os.O_CREATE != 0:
+			path := filepath.Dir(name)
+			_, last := filepath.Split(name)
+			nf := &file{}
+			nf.newFn = func(data io.ReadCloser) {
+				ls := split(f.root, path)
+				ns := strings.Split(strings.Trim(f.root+path, "/"+rootName), rootName)
+				fileHash, _ := ipfs_api.Shell().Add(data)
+				downHash := fileHash
+				downPath := last
+				for i := len(ns) - 1; i >= 0; i-- {
+					newHash := ls[i].Hash
+					newHash, _ = ipfs_api.Shell().PatchLink(newHash, downPath, downHash, false)
+					downHash = newHash
+					downPath = ns[i]
+					if i == 0 {
+						ipfs_api.Shell().Unpin(f.root)
+						f.root = newHash
+						ipfs_api.Shell().Pin(f.root)
+						memo.Write("root", []byte(f.root))
+					}
+				}
+				_, fi := trav(f.root, name)
+				Assert(fi != nil, 60)
+				nf.newFn = nil
+				nf.UnixLsLink = fi.UnixLsLink
+			}
+			return nf, nil
+		default:
+			Halt(100, name, " ", flag, perm)
+		}
 	}
+	return nil, http.ErrNotFound
 }
 
 func (f *filesystem) RemoveAll(name string) (err error) {
@@ -295,8 +337,9 @@ func (f *filesystem) Stat(name string) (os.FileInfo, error) {
 	} else if li != nil {
 		return li, nil
 	} else {
-		panic(0)
+		Halt(100, name)
 	}
+	return nil, http.ErrNotFound
 }
 
 var nodeID *go_ipfs_api.IdOutput

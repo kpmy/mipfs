@@ -2,6 +2,7 @@ package mipfs
 
 import (
 	"github.com/kpmy/mipfs/ipfs_api"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -12,7 +13,7 @@ func find(li *loc, name string) (ret *loc) {
 	for _, i := range li.Links {
 		if i.Type == "Directory" && i.Name == name {
 			ls, _ := ipfs_api.Shell().FileList(i.Hash)
-			return &loc{*ls}
+			ret = &loc{*ls}
 		}
 	}
 	return
@@ -21,23 +22,31 @@ func find(li *loc, name string) (ret *loc) {
 func find2(li *loc, name string) (ret *link) {
 	for _, i := range li.Links {
 		if i.Type == "File" && i.Name == name {
-			return &link{*i}
+			ret = &link{*i}
 		}
 	}
 	return
 }
 
 func trav(root string, name string) (*loc, *link) {
-	if name == rootName {
-		ls, _ := ipfs_api.Shell().FileList(root)
-		return &loc{*ls}, nil
+	if name == rootName || name == "/" {
+		if ls, err := ipfs_api.Shell().FileList(root); err != nil {
+			log.Fatal(err)
+			panic(100)
+		} else {
+			return &loc{*ls}, nil
+		}
 	} else {
 		_, last := filepath.Split(name)
 		l, _ := trav(root, filepath.Dir(name))
 		if li := find(l, last); li != nil {
 			return li, nil
 		} else {
-			return l, find2(l, last)
+			if f := find2(l, last); f != nil {
+				return l, f
+			} else {
+				return nil, nil
+			}
 		}
 	}
 }
@@ -45,7 +54,7 @@ func trav(root string, name string) (*loc, *link) {
 func split(rootHash string, path string) (ret []*loc) {
 	var tr func(root string) *loc
 	tr = func(root string) *loc {
-		if root == rootName {
+		if root == rootName || root == "/" {
 			ls, _ := ipfs_api.Shell().FileList(rootHash)
 			l := &loc{*ls}
 			ret = append(ret, l)
