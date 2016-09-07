@@ -17,14 +17,23 @@ import (
 	. "github.com/kpmy/ypk/tc"
 	"github.com/mattetti/filebuffer"
 	"golang.org/x/net/webdav"
+	"log"
+	"io/ioutil"
 )
+
+type write struct {
+	pos int64
+	data *filebuffer.Buffer
+}
 
 type file struct {
 	go_ipfs_api.UnixLsLink
 	pos   int64
 	buf   *filebuffer.Buffer
 	links []*go_ipfs_api.LsLink
-	newFn func(io.ReadCloser)
+	newFn, updFn func(io.ReadCloser)
+	wr chan *write
+	wg *sync.WaitGroup
 }
 
 func (f *file) Name() string {
@@ -51,6 +60,10 @@ func (f *file) Sys() interface{} {
 }
 
 func (f *file) Close() error {
+	if(f.wr != nil) {
+		close(f.wr);
+		f.wg.Wait()
+	}
 	return nil
 }
 
@@ -114,14 +127,32 @@ func (f *file) Stat() (os.FileInfo, error) {
 }
 
 func (f *file) Write(p []byte) (n int, err error) {
-	if f.newFn != nil {
-		buf := filebuffer.New(p)
-		f.newFn(buf)
-		f.pos = buf.Index
-		return int(f.pos), nil
-	} else {
-		panic(100)
+	if (f.wr == nil){
+		f.wr = make(chan *write, 16)
+		f.wg = new(sync.WaitGroup);
+		f.wg.Add(1);
+		go func(f *file) {
+			tmp, _ := ioutil.TempFile(os.TempDir(), "mipfs");
+			for w := range f.wr{
+				tmp.Seek(w.pos, io.SeekStart);
+				w.data.Seek(0, io.SeekStart);
+				io.Copy(tmp, w.data);
+			}
+			tmp.Seek(0, io.SeekStart);
+			if f.newFn != nil {
+				f.newFn(tmp);
+			} else {
+				f.updFn(tmp);
+			}
+			f.wg.Done()
+		}(f);
 	}
+	w := &write{pos: f.pos}
+	w.data = filebuffer.New(nil);
+	n, err = w.data.Write(p);
+	f.wr <- w;
+	f.pos = f.pos + int64(n);
+	return n, nil
 }
 
 type link struct {
@@ -254,8 +285,38 @@ func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
 }
 
 func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (webdav.File, error) {
+	log.Println("openfile", name, " ", flag, perm);
 	if li, fi := trav(f.root, name); fi != nil {
-		return &file{UnixLsLink: fi.UnixLsLink}, nil
+		nf := &file{UnixLsLink: fi.UnixLsLink}
+		switch {
+		case flag&os.O_RDWR != 0:
+			path := filepath.Dir(name)
+			_, last := filepath.Split(name)
+			nf.updFn = func(data io.ReadCloser) {
+				ls := split(f.root, path)
+				ns := strings.Split(strings.Trim(f.root+path, "/"+rootName), rootName)
+				fileHash, _ := ipfs_api.Shell().Add(data)
+				downHash := fileHash
+				downPath := last
+				for i := len(ns) - 1; i >= 0; i-- {
+					newHash := ls[i].Hash
+					newHash, _ = ipfs_api.Shell().PatchLink(newHash, downPath, downHash, false)
+					downHash = newHash
+					downPath = ns[i]
+					if i == 0 {
+						ipfs_api.Shell().Unpin(f.root)
+						f.root = newHash
+						ipfs_api.Shell().Pin(f.root)
+						memo.Write("root", []byte(f.root))
+					}
+				}
+				_, fi := trav(f.root, name)
+				Assert(fi != nil, 60)
+				nf.updFn = nil
+				nf.UnixLsLink = fi.UnixLsLink
+			}
+		}
+		return nf, nil;
 	} else if li != nil {
 		return li, nil
 	} else {
@@ -289,7 +350,8 @@ func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (webdav.F
 			}
 			return nf, nil
 		default:
-			Halt(100, name, " ", flag, perm)
+			log.Println(100, name, " ", flag, perm)
+			return nil, os.ErrNotExist
 		}
 	}
 	return nil, http.ErrNotFound
@@ -336,10 +398,8 @@ func (f *filesystem) Stat(name string) (os.FileInfo, error) {
 		return fi, nil
 	} else if li != nil {
 		return li, nil
-	} else {
-		Halt(100, name)
 	}
-	return nil, http.ErrNotFound
+	return nil, os.ErrNotExist
 }
 
 var nodeID *go_ipfs_api.IdOutput
@@ -360,13 +420,23 @@ func NewFS() webdav.FileSystem {
 }
 
 type locksystem struct {
+	webdav.LockSystem
 	sync.RWMutex
 	locks  map[string]string
 	tokens map[string]webdav.LockDetails
 }
 
 func (l *locksystem) Confirm(now time.Time, name0, name1 string, conditions ...webdav.Condition) (release func(), err error) {
-	panic(100)
+	l.RLock()
+	if _, ok := l.locks[name0]; ok{
+		release = func() {
+			log.Println(name0, "release")
+		}
+	} else {
+		err = webdav.ErrConfirmationFailed
+	}
+	l.RUnlock()
+	return
 }
 
 func (l *locksystem) Create(now time.Time, details webdav.LockDetails) (token string, err error) {
