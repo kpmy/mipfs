@@ -5,17 +5,35 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/kpmy/mipfs"
+	"github.com/kpmy/mipfs/ipfs_api"
+	"github.com/kpmy/mipfs/wdfs"
+	"github.com/peterbourgon/diskv"
 	"golang.org/x/net/webdav"
 )
 
-func init()  {
-	log.SetFlags(0);
+var KV *diskv.Diskv
+
+func init() {
+	log.SetFlags(0)
+
+	KV = diskv.New(diskv.Options{
+		BasePath: ".diskv",
+		Transform: func(s string) []string {
+			return []string{}
+		},
+	})
 }
 
 func main() {
-	fs := mipfs.NewFS()
-	ls := mipfs.NewLS()
+	root := "QmbuSdtGUUfL7DSvvA9DmiGSRqAzkHEjWtsxZDRPBWcawg"
+	if r, err := KV.Read("root"); err == nil {
+		root = string(r)
+	} else {
+		KV.Write("root", []byte(root))
+	}
+	nodeID, _ := ipfs_api.Shell().ID()
+	fs := wdfs.NewFS(nodeID, root)
+	ls := wdfs.NewLS(fs)
 	h := &webdav.Handler{
 		FileSystem: fs,
 		LockSystem: ls,
@@ -27,10 +45,11 @@ func main() {
 					dst = u.Path
 				}
 				o := r.Header.Get("Overwrite")
-				log.Printf("%-20s%-10s%-30s%-30so=%-2s%v", r.Method, r.URL.Path, dst, o, err)
+				log.Println(r.Method, r.URL.Path, dst, o, err)
 			default:
-				log.Printf("%-20s%-10s%-30s%v", r.Method, r.URL.Path, err)
+				log.Println(r.Method, r.URL.Path, err)
 			}
+			log.Println(fs)
 		},
 	}
 	http.Handle("/", h)
