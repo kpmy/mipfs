@@ -35,6 +35,7 @@ func main() {
 	fs := wdfs.NewFS(nodeID, root)
 	ls := wdfs.NewLS(fs)
 	h := &webdav.Handler{
+		Prefix:     "/ipfs",
 		FileSystem: fs,
 		LockSystem: ls,
 		Logger: func(r *http.Request, err error) {
@@ -49,10 +50,15 @@ func main() {
 			default:
 				log.Println(r.Method, r.URL.Path, err)
 			}
-			log.Println(fs)
+			KV.Write("root", []byte(fs.String()))
 		},
 	}
-	http.Handle("/", h)
+	http.Handle("/ipfs/", h)
+	http.HandleFunc("/ipfs", func(resp http.ResponseWriter, req *http.Request) {
+		if r, err := KV.Read("root"); err == nil {
+			resp.Write(r)
+		}
+	})
 	const addr = "0.0.0.0:6001"
 	log.Println("webdav server started at", addr)
 	http.ListenAndServe(addr, nil)

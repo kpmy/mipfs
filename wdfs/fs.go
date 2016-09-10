@@ -300,7 +300,7 @@ type filesystem struct {
 }
 
 func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
-	chain := newChain(f.root.mirror(), f.root.Hash+name)
+	chain := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(name, "/"))
 	if tail := chain.tail(); !tail.exists() {
 		for tail != nil {
 			if !tail.exists() {
@@ -319,7 +319,7 @@ func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
 }
 
 func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (ret webdav.File, err error) {
-	chain := newChain(f.root.mirror(), f.root.Hash+name)
+	chain := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(name, "/"))
 	switch tail := chain.tail(); {
 	case tail.exists() && tail.IsDir():
 		ret = &loc{ch: tail}
@@ -335,7 +335,7 @@ func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (ret webd
 }
 
 func (f *filesystem) RemoveAll(name string) (err error) {
-	chain := newChain(f.root.mirror(), f.root.Hash+name)
+	chain := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(name, "/"))
 	if tail := chain.tail(); tail.exists() {
 		tail = tail.up
 		tail.Hash, _ = ipfs_api.Shell().Patch(tail.Hash, "rm-link", tail.down.name)
@@ -350,8 +350,8 @@ func (f *filesystem) RemoveAll(name string) (err error) {
 }
 
 func (f *filesystem) Rename(oldName, newName string) (err error) {
-	on := newChain(f.root.mirror(), f.root.Hash+oldName)
-	nn := newChain(f.root.mirror(), f.root.Hash+newName)
+	on := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(oldName, "/"))
+	nn := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(newName, "/"))
 	if ot := on.tail(); ot.exists() {
 		if nt := nn.tail(); !nt.exists() {
 			Assert(ot.depth() == nt.depth(), 40)
@@ -374,7 +374,7 @@ func (f *filesystem) Rename(oldName, newName string) (err error) {
 }
 
 func (f *filesystem) Stat(name string) (fi os.FileInfo, err error) {
-	chain := newChain(f.root.mirror(), f.root.Hash+name)
+	chain := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(name, "/"))
 	tail := chain.tail()
 	if fi = tail; !tail.exists() {
 		err = os.ErrNotExist
@@ -386,7 +386,7 @@ func (f *filesystem) String() string {
 	return f.root.Hash
 }
 
-func NewFS(id *shell.IdOutput, root string) webdav.FileSystem {
+func NewFS(id *shell.IdOutput, root string) *filesystem {
 	ch := &chain{}
 	ch.Hash = root
 	ch.name = root
@@ -443,7 +443,7 @@ func (l *locksystem) Unlock(now time.Time, token string) (err error) {
 	return
 }
 
-func NewLS(fs webdav.FileSystem) webdav.LockSystem {
+func NewLS(fs webdav.FileSystem) *locksystem {
 	ret := &locksystem{}
 	ret.locks = make(map[string]string)
 	ret.tokens = make(map[string]webdav.LockDetails)
