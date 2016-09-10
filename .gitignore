@@ -26,3 +26,5 @@ _testmain.go
 *.ipr
 *.iws
 .memo
+
+dav_cmd/.diskv/root
