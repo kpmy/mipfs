@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ipfs/go-ipfs-api"
 	"github.com/kpmy/mipfs/ipfs_api"
+	"github.com/kpmy/ypk/fn"
 	. "github.com/kpmy/ypk/tc"
 	"github.com/mattetti/filebuffer"
 	"golang.org/x/net/webdav"
@@ -108,11 +109,15 @@ func (f *file) Read(p []byte) (n int, err error) {
 		f.links, _ = ipfs_api.Shell().List(f.ch.Hash)
 	}
 	if len(f.links) == 0 {
-		buf := filebuffer.New(nil)
-		rd, _ := ipfs_api.Shell().Cat(f.ch.Hash)
-		io.Copy(buf, rd)
-		buf.Seek(f.pos, io.SeekStart)
-		return buf.Read(p)
+		if fn.IsNil(f.buf) {
+			f.buf = filebuffer.New(nil)
+			rd, _ := ipfs_api.Shell().Cat(f.ch.Hash)
+			io.Copy(f.buf, rd)
+		}
+		f.buf.Seek(f.pos, io.SeekStart)
+		n, err = f.buf.Read(p)
+		f.pos = f.pos + int64(n)
+		return n, err
 	} else {
 		var end int64 = 0
 		for _, l := range f.links {
