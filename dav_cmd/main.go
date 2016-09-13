@@ -9,6 +9,7 @@ import (
 	"github.com/kpmy/mipfs/ipfs_api"
 	"github.com/kpmy/mipfs/wdfs"
 	"github.com/kpmy/ypk/fn"
+	. "github.com/kpmy/ypk/tc"
 	"github.com/peterbourgon/diskv"
 	"golang.org/x/net/webdav"
 	"os"
@@ -30,14 +31,29 @@ func init() {
 func main() {
 	log.Println(os.Getwd())
 	root := "QmbuSdtGUUfL7DSvvA9DmiGSRqAzkHEjWtsxZDRPBWcawg"
-	if r, err := KV.Read("root"); err == nil {
+	if r, err := KV.Read("root"); err == nil && len(r) > 0 {
 		root = string(r)
 	} else {
 		KV.Write("root", []byte(root))
 	}
+
 	if r, err := KV.Read("ipfs"); err == nil {
 		ipfs_api.Addr = string(r)
 	}
+
+	rootCh := make(chan string, 16)
+	go func(ch chan string) {
+		for {
+			for s := range ch {
+				if s != "" {
+					KV.Write("root", []byte(s))
+				} else {
+					Halt(100, "empty root")
+				}
+			}
+		}
+	}(rootCh)
+
 	var fs webdav.FileSystem
 	var ls webdav.LockSystem
 	if nodeID, err := ipfs_api.Shell().ID(); err == nil {
@@ -63,7 +79,8 @@ func main() {
 				default:
 					log.Println(r.Method, r.URL.Path, err)
 				}
-				KV.Write("root", []byte(fmt.Sprint(fs)))
+				//log.Println(fs)
+				rootCh <- fmt.Sprint(fs)
 			},
 		}
 		http.Handle("/ipfs/", h)

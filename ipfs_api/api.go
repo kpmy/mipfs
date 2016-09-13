@@ -4,15 +4,30 @@ import (
 	"log"
 
 	"github.com/ipfs/go-ipfs-api"
+	"net/http"
 )
 
-var sh *shell.Shell
+var sh *MyShell
 
 var Addr = "127.0.0.1:5001"
 
+type MyShell struct {
+	shell.Shell
+	Url    string
+	Client *http.Client
+}
+
 func reset() {
 	if sh == nil || !sh.IsUp() {
-		sh = shell.NewShell(Addr)
+		sh = &MyShell{
+			Url: Addr,
+			Client: &http.Client{
+				Transport: &http.Transport{
+					DisableKeepAlives: true,
+				},
+			},
+		}
+		sh.Shell = *shell.NewShellWithClient(sh.Url, sh.Client)
 		if id, err := sh.ID(); err == nil {
 			v0, _, _ := sh.Version()
 			log.Println("ipfs version", v0, "node", id.ID, "online")
@@ -20,7 +35,7 @@ func reset() {
 	}
 }
 
-func Shell() *shell.Shell {
+func Shell() *MyShell {
 	reset()
 	return sh
 }
