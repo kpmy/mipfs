@@ -7,9 +7,13 @@ ipfs2webdav
 
 `docker run -it --volumes-from ipfs_host ipfs/go-ipfs:latest`
 
+`docker restart ipfs_host`
+
 установка ipfs2webdav
 
 `git clone https://github.com/kpmy/mipfs.git`
+
+`cd mipfs`
 
 `docker build -t kpmy/mipfs:0.1 .`
 
