@@ -4,15 +4,17 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"fmt"
+	"os"
+
 	"github.com/kpmy/mipfs/ipfs_api"
 	"github.com/kpmy/mipfs/wdfs"
 	"github.com/kpmy/ypk/fn"
 	. "github.com/kpmy/ypk/tc"
 	"github.com/peterbourgon/diskv"
 	"golang.org/x/net/webdav"
-	"os"
 )
 
 var KV *diskv.Diskv
@@ -44,8 +46,13 @@ func main() {
 	rootCh := make(chan string, 16)
 	go func(ch chan string) {
 		for {
+			i := 0
 			for s := range ch {
 				if s != "" {
+					if old, err := KV.Read("root"); err == nil && s != string(old) {
+						KV.Write(fmt.Sprint("root.", time.Now().UnixNano(), ".", i), old)
+						i++
+					}
 					KV.Write("root", []byte(s))
 				} else {
 					Halt(100, "empty root")

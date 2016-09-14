@@ -64,8 +64,7 @@ func (f *file) Close() error {
 		close(f.wr)
 		f.wg.Wait()
 	} else if !f.ch.exists() {
-		log.Println("empty file close")
-		return os.ErrNotExist
+		f.update(nil)
 	}
 	return nil
 }
@@ -133,8 +132,14 @@ func (f *file) Stat() (os.FileInfo, error) {
 	return f, nil
 }
 
+const emptyFileHash = "QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"
+
 func (f *file) update(data io.ReadCloser) {
-	f.ch.Hash, _ = ipfs_api.Shell().Add(data)
+	if !fn.IsNil(data) {
+		f.ch.Hash, _ = ipfs_api.Shell().Add(data)
+	} else {
+		f.ch.Hash = emptyFileHash
+	}
 	for tail := f.ch.up; tail != nil; tail = tail.up {
 		tail.Hash, _ = ipfs_api.Shell().PatchLink(tail.Hash, tail.down.name, tail.down.Hash, false)
 		if tail.down.Hash == f.ch.Hash {
