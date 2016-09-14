@@ -3,6 +3,7 @@ package wdfs
 import (
 	"encoding/xml"
 	"github.com/kpmy/mipfs/ipfs_api"
+	"github.com/kpmy/ypk/dom"
 	. "github.com/kpmy/ypk/tc"
 	"golang.org/x/net/webdav"
 	"log"
@@ -52,9 +53,17 @@ func (l *loc) Write(p []byte) (n int, err error) {
 	return 0, webdav.ErrForbidden
 }
 
-func (l *loc) DeadProps() (map[xml.Name]webdav.Property, error) {
-	log.Println("loc prop get")
-	return nil, nil
+func (l *loc) DeadProps() (ret map[xml.Name]webdav.Property, err error) {
+	ls, _ := ipfs_api.Shell().FileList(l.ch.Hash)
+	pm := propsMap(ls)
+	ret = make(map[xml.Name]webdav.Property)
+	if p, ok := pm["*"]; ok {
+		rd, _ := ipfs_api.Shell().Cat(p.Hash)
+		if el, err := dom.Decode(rd); err == nil {
+			log.Println("loc props", el.Model())
+		}
+	}
+	return
 }
 
 func (l *loc) Patch(patch []webdav.Proppatch) ([]webdav.Propstat, error) {

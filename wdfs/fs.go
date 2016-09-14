@@ -43,7 +43,7 @@ func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
 			}
 			tail = tail.up
 		}
-		chain.link.Hash = chain.Hash
+		chain.link.update(chain.Hash)
 	} else {
 		err = os.ErrExist
 	}
@@ -79,31 +79,56 @@ func (f *filesystem) RemoveAll(name string) (err error) {
 	if tail := chain.tail(); tail.exists() {
 		tail = tail.up
 		tail.Hash, _ = ipfs_api.Shell().Patch(tail.Hash, "rm-link", tail.down.name)
+		if !tail.down.IsDir() {
+			//удалим пропы
+			if th, err := ipfs_api.Shell().Patch(tail.Hash, "rm-link", "*"+tail.down.name); err == nil {
+				tail.Hash = th
+			}
+		}
 		tail = tail.up
 		for tail != nil {
 			tail.Hash, _ = ipfs_api.Shell().PatchLink(tail.Hash, tail.down.name, tail.down.Hash, false)
 			tail = tail.up
 		}
-		chain.link.Hash = chain.Hash
+		chain.link.update(chain.Hash)
 	}
 	return
 }
 
 func (f *filesystem) Rename(oldName, newName string) (err error) {
+	log.Println("rename", oldName, newName)
 	on := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(oldName, "/"))
+	var op *chain
+	if !on.tail().IsDir() {
+		propPath := ""
+		for x := on; x != nil; x = x.down {
+			if x.down == nil {
+				propPath = propPath + "/" + "*" + x.name
+			} else {
+				propPath = propPath + "/" + x.name
+			}
+		}
+		op = newChain(f.root.mirror(), propPath)
+	}
 	nn := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(newName, "/"))
 	if ot := on.tail(); ot.exists() {
 		if nt := nn.tail(); !nt.exists() {
 			Assert(ot.depth() == nt.depth(), 40)
 			tail := ot.up
 			tail.Hash, _ = ipfs_api.Shell().Patch(tail.Hash, "rm-link", ot.name)
+			if op != nil {
+				tail.Hash, _ = ipfs_api.Shell().Patch(tail.Hash, "rm-link", op.tail().name)
+			}
 			tail.Hash, _ = ipfs_api.Shell().PatchLink(tail.Hash, nt.name, ot.Hash, false)
+			if op != nil {
+				tail.Hash, _ = ipfs_api.Shell().PatchLink(tail.Hash, "*"+nt.name, op.tail().Hash, false)
+			}
 			tail = tail.up
 			for tail != nil {
 				tail.Hash, _ = ipfs_api.Shell().PatchLink(tail.Hash, tail.down.name, tail.down.Hash, false)
 				tail = tail.up
 			}
-			on.link.Hash = on.Hash
+			on.link.update(on.Hash)
 		} else {
 			err = os.ErrExist
 		}

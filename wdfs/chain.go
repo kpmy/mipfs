@@ -18,6 +18,7 @@ type chain struct {
 func newChain(root *chain, filepath string) (ret *chain) {
 	ns := strings.Split(strings.Trim(filepath, "/"), "/")
 	Assert(ns[0] == root.Hash, 20)
+	root.name = root.Hash
 	ret = root
 	for i := 1; i < len(ns); i++ {
 		down := &chain{}
@@ -76,6 +77,11 @@ func (root *chain) mirror() (ret *chain) {
 	ret.Hash = root.Hash
 	ret.link = root
 	return
+}
+
+func (root *chain) update(hash string) {
+	Assert(hash != "", 20)
+	root.Hash = hash
 }
 
 func (c *chain) Name() string {

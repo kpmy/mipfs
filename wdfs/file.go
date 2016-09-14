@@ -11,10 +11,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kpmy/ypk/dom"
 	. "github.com/kpmy/ypk/tc"
 	"golang.org/x/net/webdav"
 	"io"
 	"log"
+	"strings"
 )
 
 type block struct {
@@ -61,6 +63,9 @@ func (f *file) Close() error {
 	if f.wr != nil {
 		close(f.wr)
 		f.wg.Wait()
+	} else if !f.ch.exists() {
+		log.Println("empty file close")
+		return os.ErrNotExist
 	}
 	return nil
 }
@@ -132,9 +137,15 @@ func (f *file) update(data io.ReadCloser) {
 	f.ch.Hash, _ = ipfs_api.Shell().Add(data)
 	for tail := f.ch.up; tail != nil; tail = tail.up {
 		tail.Hash, _ = ipfs_api.Shell().PatchLink(tail.Hash, tail.down.name, tail.down.Hash, false)
+		if tail.down.Hash == f.ch.Hash {
+			//создадим пропы
+			prop := newProps()
+			propHash, _ := ipfs_api.Shell().Add(dom.EncodeWithHeader(prop))
+			tail.Hash, _ = ipfs_api.Shell().PatchLink(tail.Hash, "*"+f.ch.name, propHash, false)
+		}
 	}
 	head := f.ch.head()
-	head.link.Hash = head.Hash
+	head.link.update(head.Hash)
 }
 
 func (f *file) Write(p []byte) (n int, err error) {
@@ -162,9 +173,19 @@ func (f *file) Write(p []byte) (n int, err error) {
 	return n, nil
 }
 
-func (f *file) DeadProps() (map[xml.Name]webdav.Property, error) {
+func (f *file) DeadProps() (ret map[xml.Name]webdav.Property, err error) {
 	log.Println("file prop get")
-	return nil, nil
+	if !strings.HasPrefix(f.ch.name, "*") {
+		ls, _ := ipfs_api.Shell().FileList(f.ch.up.Hash)
+		pm := propsMap(ls)
+		if p, ok := pm[f.ch.name]; ok {
+			rd, _ := ipfs_api.Shell().Cat(p.Hash)
+			if el, err := dom.Decode(rd); err == nil {
+				log.Println("file props", el.Model())
+			}
+		}
+	}
+	return
 }
 
 func (f *file) Patch(patch []webdav.Proppatch) ([]webdav.Propstat, error) {
