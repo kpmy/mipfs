@@ -4,11 +4,11 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"time"
 
 	"fmt"
 	"os"
 
+	"bytes"
 	"github.com/kpmy/mipfs/ipfs_api"
 	"github.com/kpmy/mipfs/wdfs"
 	"github.com/kpmy/ypk/fn"
@@ -32,11 +32,11 @@ func init() {
 
 func main() {
 	log.Println(os.Getwd())
-	root := "QmbuSdtGUUfL7DSvvA9DmiGSRqAzkHEjWtsxZDRPBWcawg"
+	defaultRoot := "QmbuSdtGUUfL7DSvvA9DmiGSRqAzkHEjWtsxZDRPBWcawg"
 	if r, err := KV.Read("root"); err == nil && len(r) > 0 {
-		root = string(r)
+		defaultRoot = string(r)
 	} else {
-		KV.Write("root", []byte(root))
+		KV.Write("root", []byte(defaultRoot))
 	}
 
 	if r, err := KV.Read("ipfs"); err == nil {
@@ -50,7 +50,13 @@ func main() {
 			for s := range ch {
 				if s != "" {
 					if old, err := KV.Read("root"); err == nil && s != string(old) {
-						KV.Write(fmt.Sprint("root.", time.Now().UnixNano(), ".", i), old)
+						history := new(bytes.Buffer)
+						if hs, err := KV.Read("root.history"); err == nil {
+							history.Write(hs)
+							history.Write([]byte("\n"))
+						}
+						history.Write(old)
+						KV.Write("root.history", history.Bytes())
 						i++
 					}
 					KV.Write("root", []byte(s))
@@ -64,7 +70,7 @@ func main() {
 	var fs webdav.FileSystem
 	var ls webdav.LockSystem
 	if nodeID, err := ipfs_api.Shell().ID(); err == nil {
-		fs = wdfs.NewFS(nodeID, root)
+		fs = wdfs.NewFS(nodeID, defaultRoot)
 		ls = wdfs.NewLS(fs)
 	} else {
 		log.Fatal(err)
@@ -94,8 +100,10 @@ func main() {
 		http.Handle("/ipfs", h)
 	}
 	http.HandleFunc("/hash", func(resp http.ResponseWriter, req *http.Request) {
-		if r, err := KV.Read("root"); err == nil {
-			resp.Write(r)
+		if rh, err := KV.Read("root"); err == nil {
+			rootHash := string(rh)
+			tpl := "<html><body><a href='http://o.ocsf.in:8080/ipfs/" + rootHash + "'>" + rootHash + "</a></body></html>"
+			resp.Write([]byte(tpl))
 		}
 	})
 	const addr = "0.0.0.0:6001"

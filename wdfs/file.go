@@ -11,11 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"bytes"
 	"github.com/kpmy/ypk/dom"
 	. "github.com/kpmy/ypk/tc"
 	"golang.org/x/net/webdav"
 	"io"
 	"log"
+	"reflect"
 	"strings"
 )
 
@@ -178,22 +180,90 @@ func (f *file) Write(p []byte) (n int, err error) {
 	return n, nil
 }
 
-func (f *file) DeadProps() (ret map[xml.Name]webdav.Property, err error) {
-	log.Println("file prop get")
+func (f *file) readPropsObject() (props map[xml.Name]dom.Element, err error) {
 	if !strings.HasPrefix(f.ch.name, "*") {
 		ls, _ := ipfs_api.Shell().FileList(f.ch.up.Hash)
-		pm := propsMap(ls)
+		pm := propLinksMap(ls)
 		if p, ok := pm[f.ch.name]; ok {
 			rd, _ := ipfs_api.Shell().Cat(p.Hash)
 			if el, err := dom.Decode(rd); err == nil {
-				log.Println("file props", el.Model())
+				props = readProps(el.Model())
 			}
 		}
 	}
 	return
 }
 
-func (f *file) Patch(patch []webdav.Proppatch) ([]webdav.Propstat, error) {
+func (f *file) writePropsObject(props map[xml.Name]dom.Element) {
+	if !strings.HasPrefix(f.ch.name, "*") {
+		el := writeProps(props)
+		propHash, _ := ipfs_api.Shell().Add(dom.Encode(el))
+		for tail := f.ch.up; tail != nil; tail = tail.up {
+			if tail.down.Hash == f.ch.Hash {
+				tail.Hash, _ = ipfs_api.Shell().PatchLink(tail.Hash, "*"+f.ch.name, propHash, false)
+			} else {
+				tail.Hash, _ = ipfs_api.Shell().PatchLink(tail.Hash, tail.down.name, tail.down.Hash, false)
+			}
+		}
+		head := f.ch.head()
+		head.link.update(head.Hash)
+	}
+}
+
+func (f *file) DeadProps() (ret map[xml.Name]webdav.Property, err error) {
+	log.Println("file prop get")
+	ret = make(map[xml.Name]webdav.Property)
+	pm, _ := f.readPropsObject()
+	for k, v := range pm {
+		p := webdav.Property{XMLName: k}
+		buf := new(bytes.Buffer)
+		Assert(v.ChildrenCount() == 1, 40)
+		c0 := v.Children()[0]
+		switch c := c0.(type) {
+		case dom.Element:
+			rd := dom.Encode(c)
+			io.Copy(buf, rd)
+		case dom.Text:
+			xml.EscapeText(buf, []byte(c.Data()))
+		default:
+			Halt(100, reflect.TypeOf(c))
+		}
+		p.InnerXML = buf.Bytes()
+		ret[k] = p
+	}
+	log.Println("read file props", ret)
+	return
+}
+
+func (f *file) Patch(patch []webdav.Proppatch) (ret []webdav.Propstat, err error) {
 	log.Println("file prop patch", patch)
-	return nil, nil
+	ret = []webdav.Propstat{}
+	pe, _ := f.readPropsObject()
+	for _, pl := range patch {
+		ps := webdav.Propstat{}
+		for _, p := range pl.Props {
+			if pl.Remove {
+				delete(pe, p.XMLName)
+			} else {
+				el := dom.Elem("prop")
+				el.Attr("local", p.XMLName.Local)
+				el.Attr("space", p.XMLName.Space)
+				e, _ := dom.Decode(bytes.NewBuffer(p.InnerXML))
+				if !fn.IsNil(e.Model()) {
+					el.AppendChild(e.Model())
+				} else if !fn.IsNil(e.Data()) {
+					el.AppendChild(e.Data())
+				} else {
+					Halt(100)
+				}
+				pe[p.XMLName] = el
+			}
+			ps.Props = append(ps.Props, p)
+		}
+		ps.Status = 200
+		ret = append(ret, ps)
+	}
+	log.Println("write file props", pe)
+	f.writePropsObject(pe)
+	return
 }

@@ -55,7 +55,7 @@ func (l *loc) Write(p []byte) (n int, err error) {
 
 func (l *loc) DeadProps() (ret map[xml.Name]webdav.Property, err error) {
 	ls, _ := ipfs_api.Shell().FileList(l.ch.Hash)
-	pm := propsMap(ls)
+	pm := propLinksMap(ls)
 	ret = make(map[xml.Name]webdav.Property)
 	if p, ok := pm["*"]; ok {
 		rd, _ := ipfs_api.Shell().Cat(p.Hash)
