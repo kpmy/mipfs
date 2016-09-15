@@ -197,7 +197,7 @@ func (f *file) readPropsObject() (props map[xml.Name]dom.Element, err error) {
 func (f *file) writePropsObject(props map[xml.Name]dom.Element) {
 	if !strings.HasPrefix(f.ch.name, "*") {
 		el := writeProps(props)
-		propHash, _ := ipfs_api.Shell().Add(dom.Encode(el))
+		propHash, _ := ipfs_api.Shell().Add(dom.EncodeWithHeader(el))
 		for tail := f.ch.up; tail != nil; tail = tail.up {
 			if tail.down.Hash == f.ch.Hash {
 				tail.Hash, _ = ipfs_api.Shell().PatchLink(tail.Hash, "*"+f.ch.name, propHash, false)
