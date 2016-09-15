@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"bytes"
+
 	"github.com/kpmy/mipfs/ipfs_api"
 	"github.com/kpmy/mipfs/wdfs"
 	"github.com/kpmy/ypk/fn"
@@ -32,7 +33,7 @@ func init() {
 
 func main() {
 	log.Println(os.Getwd())
-	defaultRoot := "QmbuSdtGUUfL7DSvvA9DmiGSRqAzkHEjWtsxZDRPBWcawg"
+	defaultRoot := "QmdniF66q5wYDEyp2PYp6wXwgTUg3ssmb8NYSyfytwyf2j"
 	if r, err := KV.Read("root"); err == nil && len(r) > 0 {
 		defaultRoot = string(r)
 	} else {
