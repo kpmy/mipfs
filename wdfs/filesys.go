@@ -1,6 +1,7 @@
 package wdfs
 
 import (
+	"fmt"
 	"github.com/ipfs/go-ipfs-api"
 	"github.com/kpmy/mipfs/ipfs_api"
 	"github.com/kpmy/ypk/dom"
@@ -10,6 +11,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 )
 
 type filesystem struct {
@@ -26,7 +28,8 @@ func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
 			if !tail.exists() {
 				if onlyOne {
 					tail.Hash, _ = ipfs_api.Shell().NewObject("unixfs-dir")
-					prop := newProps()
+					prop := newPropsModel()
+					prop.Attr("modified", fmt.Sprint(time.Now().Unix()))
 					propHash, _ := ipfs_api.Shell().Add(dom.EncodeWithHeader(prop))
 					if tail.Hash, err = ipfs_api.Shell().PatchLink(tail.Hash, "*", propHash, false); err != nil {
 						log.Fatal(err)
@@ -55,9 +58,13 @@ func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (ret webd
 	path := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(name, "/"))
 	switch tail := path.tail(); {
 	case tail.exists() && tail.IsDir():
-		ret = &loc{ch: tail}
+		_l := &loc{ch: tail}
+		_l.readPropsModel()
+		ret = _l
 	case tail.exists() && !tail.IsDir():
-		ret = &file{ch: tail}
+		_f := &file{ch: tail}
+		_f.readPropsModel()
+		ret = _f
 	case !tail.exists() && flag&os.O_CREATE != 0:
 		var edir *chain
 		for edir = tail.up; edir != nil && edir.exists() && edir.IsDir(); edir = edir.up {
@@ -96,7 +103,7 @@ func (f *filesystem) RemoveAll(name string) (err error) {
 }
 
 func (f *filesystem) Rename(oldName, newName string) (err error) {
-	log.Println("rename", oldName, newName)
+	//log.Println("rename", oldName, newName)
 	on := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(oldName, "/"))
 	var op *chain
 	if !on.tail().IsDir() {
@@ -139,17 +146,33 @@ func (f *filesystem) Rename(oldName, newName string) (err error) {
 }
 
 func (f *filesystem) Stat(name string) (fi os.FileInfo, err error) {
-	log.Println("stat", name)
+	//log.Println("stat", name)
 	chain := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(name, "/"))
 	tail := chain.tail()
-	if fi = tail; !tail.exists() {
+	if !tail.exists() {
 		err = os.ErrNotExist
+	} else if tail.IsDir() {
+		_l := &loc{ch: tail}
+		_l.readPropsModel()
+		fi = _l
+	} else {
+		_f := &file{ch: tail}
+		_f.readPropsModel()
+		fi = _f
 	}
 	return
 }
 
 func (f *filesystem) String() string {
 	return f.root.Hash
+}
+
+func (f *filesystem) ETag(name string) (ret string, err error) {
+	var fi os.FileInfo
+	if fi, err = f.Stat(name); err == nil {
+		ret = fmt.Sprintf(`"%x%x"`, fi.ModTime().UnixNano(), fi.Size())
+	}
+	return
 }
 
 func NewFS(id *shell.IdOutput, root string) *filesystem {

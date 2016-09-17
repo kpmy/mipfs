@@ -6,7 +6,6 @@ import (
 	. "github.com/kpmy/ypk/tc"
 	"os"
 	"strings"
-	"time"
 )
 
 type chain struct {
@@ -84,14 +83,6 @@ func (root *chain) update(hash string) {
 	root.Hash = hash
 }
 
-func (c *chain) Name() string {
-	return c.name
-}
-
-func (c *chain) Size() int64 {
-	return int64(c.UnixLsObject.Size)
-}
-
 func (c *chain) Mode() os.FileMode {
 	if c.Type == "Directory" {
 		return os.ModeDir
@@ -101,14 +92,6 @@ func (c *chain) Mode() os.FileMode {
 	panic(100)
 }
 
-func (c *chain) ModTime() time.Time {
-	return time.Now()
-}
-
 func (c *chain) IsDir() bool {
 	return c.Mode() == os.ModeDir
-}
-func (c *chain) Sys() interface{} {
-	Halt(100)
-	return nil
 }

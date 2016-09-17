@@ -68,19 +68,20 @@ func main() {
 		}
 	}(rootCh)
 
-	var fs webdav.FileSystem
-	var ls webdav.LockSystem
+	var fs interface{}
+	var ls interface{}
 	if nodeID, err := ipfs_api.Shell().ID(); err == nil {
-		fs = wdfs.NewFS(nodeID, defaultRoot)
-		ls = wdfs.NewLS(fs)
+		_fs := wdfs.NewFS(nodeID, defaultRoot)
+		fs = _fs
+		ls = wdfs.NewLS(_fs)
 	} else {
 		log.Fatal(err)
 	}
 	if !fn.IsNil(fs) {
 		h := &webdav.Handler{
 			Prefix:     "/ipfs",
-			FileSystem: fs,
-			LockSystem: ls,
+			FileSystem: fs.(webdav.FileSystem),
+			LockSystem: ls.(webdav.LockSystem),
 			Logger: func(r *http.Request, err error) {
 				switch r.Method {
 				case "COPY", "MOVE":
