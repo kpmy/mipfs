@@ -3,7 +3,7 @@ ipfs2webdav
 
 установка ipfs
 
-`docker run -d --name ipfs_host -p 8080:8080 -p 4001:4001 -p 5001:5001 ipfs/go-ipfs:latest`
+`docker run -d --name ipfs_host -p 8080:8080 -p 4001:4001 -p 127.0.0.1:5001:5001 ipfs/go-ipfs:latest`
 
 `docker run -it --volumes-from ipfs_host ipfs/go-ipfs:latest`
 
