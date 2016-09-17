@@ -8,7 +8,6 @@ import (
 	"github.com/kpmy/ypk/fn"
 	. "github.com/kpmy/ypk/tc"
 	"golang.org/x/net/webdav"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -32,7 +31,7 @@ func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
 					prop.Attr("modified", fmt.Sprint(time.Now().Unix()))
 					propHash, _ := ipfs_api.Shell().Add(dom.EncodeWithHeader(prop))
 					if tail.Hash, err = ipfs_api.Shell().PatchLink(tail.Hash, "*", propHash, false); err != nil {
-						log.Fatal(err)
+						Halt(100, err)
 						return
 					}
 					onlyOne = false
@@ -54,7 +53,7 @@ func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
 }
 
 func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (ret webdav.File, err error) {
-	log.Println("open", name, flag, perm)
+	//log.Println("open", name, flag, perm)
 	path := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(name, "/"))
 	switch tail := path.tail(); {
 	case tail.exists() && tail.IsDir():
@@ -75,7 +74,7 @@ func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (ret webd
 			err = os.ErrNotExist
 		}
 	default:
-		log.Println("open error", name, flag, perm)
+		//log.Println("open error", name, flag, perm)
 		err = os.ErrNotExist
 	}
 	return

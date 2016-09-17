@@ -3,7 +3,6 @@ package wdfs
 import (
 	"fmt"
 	"golang.org/x/net/webdav"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -21,7 +20,7 @@ type locksystem struct {
 
 func (l *locksystem) Confirm(now time.Time, name0, name1 string, conditions ...webdav.Condition) (release func(), err error) {
 	const noLock = "DAV:no-lock"
-	log.Println("confirm", name0, name1, conditions)
+	//log.Println("confirm", name0, name1, conditions)
 	l.RLock()
 	tok0, ok0 := l.locks[name0]
 	if _, ok1 := l.locks[name1]; ok1 {
@@ -48,14 +47,14 @@ func (l *locksystem) Confirm(now time.Time, name0, name1 string, conditions ...w
 			break
 		}
 	}
-	log.Println(ok)
+	//log.Println(ok)
 	if ok && !l.holds[name0] {
 		l.RUnlock()
 		l.Lock()
 		l.holds[name0] = true
 		release = func() {
 			delete(l.holds, name0)
-			log.Println(name0, "release")
+			//log.Println(name0, "release")
 		}
 		l.RWMutex.Unlock()
 	} else {
@@ -91,7 +90,7 @@ func (l *locksystem) ParentLocks(name string) (ret []string) {
 }
 
 func (l *locksystem) Create(now time.Time, details webdav.LockDetails) (token string, err error) {
-	log.Println("lock", details)
+	//log.Println("lock", details)
 	l.RLock()
 	if _, ok := l.locks[details.Root]; !ok && len(l.ParentLocks(details.Root)) == 0 {
 		l.RUnlock()
@@ -99,7 +98,7 @@ func (l *locksystem) Create(now time.Time, details webdav.LockDetails) (token st
 		token = <-l.idx + ":" + fmt.Sprint(now.UnixNano())
 		l.locks[details.Root] = token
 		l.tokens[token] = details
-		log.Println("locked", token)
+		//log.Println("locked", token)
 		l.RWMutex.Unlock()
 	} else {
 		l.RUnlock()
@@ -122,7 +121,7 @@ func (l *locksystem) Refresh(now time.Time, token string, duration time.Duration
 }
 
 func (l *locksystem) Unlock(now time.Time, token string) (err error) {
-	log.Println("unlock", token)
+	//log.Println("unlock", token)
 	l.Lock()
 	if details, ok := l.tokens[token]; ok {
 		if !l.holds[details.Root] {

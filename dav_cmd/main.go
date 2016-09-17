@@ -16,13 +16,12 @@ import (
 	. "github.com/kpmy/ypk/tc"
 	"github.com/peterbourgon/diskv"
 	"golang.org/x/net/webdav"
+	"io"
 )
 
 var KV *diskv.Diskv
 
 func init() {
-	log.SetFlags(0)
-
 	KV = diskv.New(diskv.Options{
 		BasePath: ".diskv",
 		Transform: func(s string) []string {
@@ -31,18 +30,26 @@ func init() {
 	})
 }
 
+const emptyDir = "QmdniF66q5wYDEyp2PYp6wXwgTUg3ssmb8NYSyfytwyf2j"
+
 func main() {
-	log.Println(os.Getwd())
-	defaultRoot := "QmdniF66q5wYDEyp2PYp6wXwgTUg3ssmb8NYSyfytwyf2j"
+	dir, _ := os.Getwd()
+	log.Println("started at", dir)
+
+	defaultRoot := emptyDir
 	if r, err := KV.Read("root"); err == nil && len(r) > 0 {
 		defaultRoot = string(r)
 	} else {
 		KV.Write("root", []byte(defaultRoot))
 	}
 
+	log.Println("root hash", defaultRoot)
+
 	if r, err := KV.Read("ipfs"); err == nil {
 		ipfs_api.Addr = string(r)
 	}
+
+	log.Println("ipfs api at", ipfs_api.Addr)
 
 	rootCh := make(chan string, 16)
 	go func(ch chan string) {
@@ -52,11 +59,11 @@ func main() {
 				if s != "" {
 					if old, err := KV.Read("root"); err == nil && s != string(old) {
 						history := new(bytes.Buffer)
-						if hs, err := KV.Read("root.history"); err == nil {
-							history.Write(hs)
-							history.Write([]byte("\n"))
-						}
 						history.Write(old)
+						history.Write([]byte("\n"))
+						if hs, err := KV.Read("root.history"); err == nil {
+							io.CopyN(history, bytes.NewBuffer(hs), int64(history.Len()*128)) //лимит истории
+						}
 						KV.Write("root.history", history.Bytes())
 						i++
 					}

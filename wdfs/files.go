@@ -16,7 +16,6 @@ import (
 	. "github.com/kpmy/ypk/tc"
 	"golang.org/x/net/webdav"
 	"io"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -232,18 +231,18 @@ func (f *file) writePropsObject(props map[xml.Name]dom.Element) {
 }
 
 func (f *file) DeadProps() (ret map[xml.Name]webdav.Property, err error) {
-	log.Println("file prop get")
+	//log.Println("file prop get")
 	pm, _ := f.readPropsObject()
 	ret = props2webdav(pm)
-	log.Println("read file props", ret)
+	//log.Println("read file props", ret)
 	return
 }
 
 func (f *file) Patch(patch []webdav.Proppatch) (ret []webdav.Propstat, err error) {
-	log.Println("file prop patch", patch)
+	//log.Println("file prop patch", patch)
 	pe, _ := f.readPropsObject()
 	ret = propsPatch(pe, patch)
-	log.Println("write file props", pe)
+	//log.Println("write file props", pe)
 	f.writePropsObject(pe)
 	return
 }
