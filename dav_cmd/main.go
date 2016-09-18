@@ -9,12 +9,13 @@ import (
 	"os"
 
 	"bytes"
-
+	"github.com/abbot/go-http-auth"
 	"github.com/kpmy/mipfs/ipfs_api"
 	"github.com/kpmy/mipfs/wdfs"
 	"github.com/kpmy/ypk/fn"
 	. "github.com/kpmy/ypk/tc"
 	"github.com/peterbourgon/diskv"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/net/webdav"
 	"io"
 )
@@ -84,30 +85,43 @@ func main() {
 	} else {
 		log.Fatal(err)
 	}
-	if !fn.IsNil(fs) {
-		h := &webdav.Handler{
-			Prefix:     "/ipfs",
-			FileSystem: fs.(webdav.FileSystem),
-			LockSystem: ls.(webdav.LockSystem),
-			Logger: func(r *http.Request, err error) {
-				switch r.Method {
-				case "COPY", "MOVE":
-					dst := ""
-					if u, err := url.Parse(r.Header.Get("Destination")); err == nil {
-						dst = u.Path
-					}
-					o := r.Header.Get("Overwrite")
-					log.Println(r.Method, r.URL.Path, dst, o, err)
-				default:
-					log.Println(r.Method, r.URL.Path, err)
+	Assert(!fn.IsNil(fs), 40)
+
+	dav := &webdav.Handler{
+		Prefix:     "/ipfs",
+		FileSystem: fs.(webdav.FileSystem),
+		LockSystem: ls.(webdav.LockSystem),
+		Logger: func(r *http.Request, err error) {
+			switch r.Method {
+			case "COPY", "MOVE":
+				dst := ""
+				if u, err := url.Parse(r.Header.Get("Destination")); err == nil {
+					dst = u.Path
 				}
-				//log.Println(fs)
-				rootCh <- fmt.Sprint(fs)
-			},
-		}
-		http.Handle("/ipfs/", h)
-		http.Handle("/ipfs", h)
+				o := r.Header.Get("Overwrite")
+				log.Println(r.Method, r.URL.Path, dst, o, err)
+			default:
+				log.Println(r.Method, r.URL.Path, err)
+			}
+			//log.Println(fs)
+			rootCh <- fmt.Sprint(fs)
+		},
 	}
+
+	davAuth := auth.NewBasicAuthenticator("ipfs", func(user, realm string) (ret string) {
+		switch user {
+		case "root":
+			hash, _ := bcrypt.GenerateFromPassword([]byte("root"), bcrypt.DefaultCost)
+			ret = string(hash)
+		}
+		return
+	}).Wrap(func(resp http.ResponseWriter, req *auth.AuthenticatedRequest) {
+		dav.ServeHTTP(resp, &req.Request)
+	})
+
+	http.Handle("/ipfs/", davAuth)
+	http.Handle("/ipfs", davAuth)
+
 	http.HandleFunc("/hash", func(resp http.ResponseWriter, req *http.Request) {
 		if rh, err := KV.Read("root"); err == nil {
 			rootHash := string(rh)
