@@ -1,7 +1,6 @@
 # mipfs
-ipfs2webdav
 
-установка ipfs
+install ipfs
 
 `docker run -d --name ipfs_host -p 8080:8080 -p 4001:4001 -p 127.0.0.1:5001:5001 ipfs/go-ipfs:latest`
 
@@ -9,7 +8,7 @@ ipfs2webdav
 
 `docker restart ipfs_host`
 
-установка ipfs2webdav
+## ipfs2webdav
 
 `git clone https://github.com/kpmy/mipfs.git`
 
