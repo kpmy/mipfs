@@ -1,4 +1,4 @@
-# mipfs
+# mipfs (middleware for ipfs)
 
 install ipfs
 
