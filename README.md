@@ -19,3 +19,12 @@ install ipfs
 `docker create --restart always --name ipfs_webdav --link ipfs_host:ipfs -p 0.0.0.0:6001:6001 kpmy/mipfs:0.1`
 
 `docker start ipfs_webdav`
+
+### how to
+
+connect to webdav ipfs `cadaver http://<addr>:6001/ipfs/` 
+
+upload some files `cadaver put /path/to/file`
+
+then look in browser `http://<addr>:6001/hash`
+
