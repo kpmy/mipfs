@@ -1,7 +1,6 @@
-# mipfs
-ipfs2webdav
+# mipfs (middleware for ipfs)
 
-установка ipfs
+install ipfs
 
 `docker run -d --name ipfs_host -p 8080:8080 -p 4001:4001 -p 127.0.0.1:5001:5001 ipfs/go-ipfs:latest`
 
@@ -9,7 +8,7 @@ ipfs2webdav
 
 `docker restart ipfs_host`
 
-установка ipfs2webdav
+## ipfs2webdav
 
 `git clone https://github.com/kpmy/mipfs.git`
 
@@ -20,3 +19,12 @@ ipfs2webdav
 `docker create --restart always --name ipfs_webdav --link ipfs_host:ipfs -p 0.0.0.0:6001:6001 kpmy/mipfs:0.1`
 
 `docker start ipfs_webdav`
+
+### how to
+
+connect to webdav ipfs `cadaver http://<addr>:6001/ipfs/` 
+
+upload some files `cadaver put /path/to/file`
+
+then look in browser `http://<addr>:6001/hash`
+
