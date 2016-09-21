@@ -18,14 +18,10 @@ type MyShell struct {
 }
 
 func reset() {
-	if sh == nil || !sh.IsUp() {
+	if sh == nil {
 		sh = &MyShell{
-			Url: Addr,
-			Client: &http.Client{
-				Transport: &http.Transport{
-					DisableKeepAlives: true,
-				},
-			},
+			Url:    Addr,
+			Client: http.DefaultClient,
 		}
 		sh.Shell = *shell.NewShellWithClient(sh.Url, sh.Client)
 		if id, err := sh.ID(); err == nil {

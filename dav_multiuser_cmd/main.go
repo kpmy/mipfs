@@ -9,6 +9,7 @@ import (
 	"github.com/tv42/zbase32"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 )
 

@@ -15,6 +15,7 @@ import (
 )
 
 var um cmap.ConcurrentMap = cmap.New()
+var rm cmap.ConcurrentMap = cmap.New()
 
 type FileLockSys struct {
 	fs  webdav.FileSystem
@@ -31,11 +32,11 @@ func handler() http.Handler {
 		return
 	}).Wrap(func(resp http.ResponseWriter, req *auth.AuthenticatedRequest) {
 		if !um.Has(req.Username) {
+			user := zbase32.EncodeToString([]byte(req.Username))
 			fl := new(FileLockSys)
 
-			rootCh := make(chan string, 256)
+			rootWr := make(chan string, 256)
 			go func(ch chan string, user string) {
-				user = zbase32.EncodeToString([]byte(user))
 				for {
 					i := 0
 					for s := range ch {
@@ -51,24 +52,28 @@ func handler() http.Handler {
 								i++
 							}
 							KV.Write(user+".root", []byte(s))
+
 						} else {
 							Halt(100, "empty root")
 						}
 					}
 				}
-			}(rootCh, req.Username)
+			}(rootWr, user)
+
+			defaultRoot := wdfs.EmptyDirHash
+			if r, err := KV.Read(user + ".root"); err == nil && len(r) > 0 {
+				defaultRoot = string(r)
+			} else {
+				KV.Write(user+".root", []byte(defaultRoot))
+			}
+			rm.Set(user+".root", defaultRoot)
 
 			fs := wdfs.NewFS(func() string {
-				user := zbase32.EncodeToString([]byte(req.Username))
-				defaultRoot := wdfs.EmptyDirHash
-				if r, err := KV.Read(user + ".root"); err == nil && len(r) > 0 {
-					defaultRoot = string(r)
-				} else {
-					KV.Write(user+".root", []byte(defaultRoot))
-				}
-				return defaultRoot
+				r, _ := rm.Get(user + ".root")
+				return r.(string)
 			}, func(hash string) {
-				rootCh <- hash
+				rm.Set(user+".root", hash)
+				rootWr <- hash
 			})
 			fl.fs = fs
 			fl.ls = wdfs.NewLS(fs)
