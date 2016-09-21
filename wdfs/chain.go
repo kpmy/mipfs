@@ -12,6 +12,7 @@ type chain struct {
 	up, down, link *chain
 	shell.UnixLsObject
 	name string
+	upd  func(string)
 }
 
 func newChain(root *chain, filepath string) (ret *chain) {
@@ -81,6 +82,7 @@ func (root *chain) mirror() (ret *chain) {
 func (root *chain) update(hash string) {
 	Assert(hash != "", 20)
 	root.Hash = hash
+	root.upd(hash)
 }
 
 func (c *chain) Mode() os.FileMode {

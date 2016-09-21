@@ -2,7 +2,6 @@ package wdfs
 
 import (
 	"fmt"
-	"github.com/ipfs/go-ipfs-api"
 	"github.com/kpmy/mipfs/ipfs_api"
 	"github.com/kpmy/ypk/dom"
 	"github.com/kpmy/ypk/fn"
@@ -13,14 +12,26 @@ import (
 	"time"
 )
 
+const EmptyDirHash = "QmdniF66q5wYDEyp2PYp6wXwgTUg3ssmb8NYSyfytwyf2j"
+const EmptyFileHash = "QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"
+
 type filesystem struct {
 	webdav.FileSystem
-	nodeId *shell.IdOutput
-	root   *chain
+	rootLevel *chain
+	get       func() string
+	set       func(string)
+}
+
+func (f *filesystem) root() *chain {
+	f.rootLevel.Hash = f.get()
+	f.rootLevel.name = f.rootLevel.Hash
+	f.rootLevel.upd = f.set
+	return f.rootLevel
 }
 
 func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
-	chain := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(name, "/"))
+	root := f.root()
+	chain := newChain(root.mirror(), root.Hash+"/"+strings.Trim(name, "/"))
 	if tail := chain.tail(); !tail.exists() {
 		onlyOne := true
 		for tail != nil {
@@ -54,7 +65,8 @@ func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
 
 func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (ret webdav.File, err error) {
 	//log.Println("open", name, flag, perm)
-	path := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(name, "/"))
+	root := f.root()
+	path := newChain(root.mirror(), root.Hash+"/"+strings.Trim(name, "/"))
 	switch tail := path.tail(); {
 	case tail.exists() && tail.IsDir():
 		_l := &loc{ch: tail}
@@ -81,7 +93,8 @@ func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (ret webd
 }
 
 func (f *filesystem) RemoveAll(name string) (err error) {
-	chain := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(name, "/"))
+	root := f.root()
+	chain := newChain(root.mirror(), root.Hash+"/"+strings.Trim(name, "/"))
 	if tail := chain.tail(); tail.exists() {
 		tail = tail.up
 		tail.Hash, _ = ipfs_api.Shell().Patch(tail.Hash, "rm-link", tail.down.name)
@@ -103,7 +116,8 @@ func (f *filesystem) RemoveAll(name string) (err error) {
 
 func (f *filesystem) Rename(oldName, newName string) (err error) {
 	//log.Println("rename", oldName, newName)
-	on := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(oldName, "/"))
+	root := f.root()
+	on := newChain(root.mirror(), root.Hash+"/"+strings.Trim(oldName, "/"))
 	var op *chain
 	if !on.tail().IsDir() {
 		propPath := ""
@@ -114,9 +128,9 @@ func (f *filesystem) Rename(oldName, newName string) (err error) {
 				propPath = propPath + "/" + x.name
 			}
 		}
-		op = newChain(f.root.mirror(), propPath)
+		op = newChain(root.mirror(), propPath)
 	}
-	nn := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(newName, "/"))
+	nn := newChain(root.mirror(), root.Hash+"/"+strings.Trim(newName, "/"))
 	if ot := on.tail(); ot.exists() {
 		if nt := nn.tail(); !nt.exists() {
 			Assert(ot.depth() == nt.depth(), 40)
@@ -146,7 +160,8 @@ func (f *filesystem) Rename(oldName, newName string) (err error) {
 
 func (f *filesystem) Stat(name string) (fi os.FileInfo, err error) {
 	//log.Println("stat", name)
-	chain := newChain(f.root.mirror(), f.root.Hash+"/"+strings.Trim(name, "/"))
+	root := f.root()
+	chain := newChain(root.mirror(), root.Hash+"/"+strings.Trim(name, "/"))
 	tail := chain.tail()
 	if !tail.exists() {
 		err = os.ErrNotExist
@@ -163,7 +178,7 @@ func (f *filesystem) Stat(name string) (fi os.FileInfo, err error) {
 }
 
 func (f *filesystem) String() string {
-	return f.root.Hash
+	return f.rootLevel.Hash
 }
 
 func (f *filesystem) ETag(name string) (ret string, err error) {
@@ -174,10 +189,10 @@ func (f *filesystem) ETag(name string) (ret string, err error) {
 	return
 }
 
-func NewFS(id *shell.IdOutput, root string) *filesystem {
+func NewFS(get func() string, set func(string)) *filesystem {
 	ch := &chain{}
-	ch.Hash = root
-	ch.name = root
+	ch.Hash = get()
+	ch.name = ch.Hash
 	ch.Type = "Directory"
-	return &filesystem{nodeId: id, root: ch}
+	return &filesystem{get: get, set: set, rootLevel: ch}
 }

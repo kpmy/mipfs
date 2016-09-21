@@ -27,7 +27,6 @@ _testmain.go
 *.iws
 .memo
 
-dav_cmd/.diskv/root
 .diskv
 dav_test
 
