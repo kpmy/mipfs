@@ -28,3 +28,7 @@ upload some files `cadaver put /path/to/file`
 
 then look in browser `http://<addr>:6001/hash`
 
+default user/password: root:changeme
+
+add new user: `curl -H "Content-Type: application/json" -d '{"login": "user", "password": "password"}' http://<host>:6001/user`
+

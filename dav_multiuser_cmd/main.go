@@ -38,6 +38,7 @@ func main() {
 	dav := handler()
 	http.Handle("/ipfs/", dav)
 	http.Handle("/ipfs", dav)
+
 	http.HandleFunc("/hash", auth.NewBasicAuthenticator("ipfs", func(user, realm string) (ret string) {
 		un := zbase32.EncodeToString([]byte(user))
 		if hash, err := KV.Read(un); err == nil {
@@ -52,6 +53,9 @@ func main() {
 			resp.Write([]byte(tpl))
 		}
 	}))
+
+	http.Handle("/user", regHandler())
+
 	const addr = "0.0.0.0:6001"
 	log.Println("webdav server started at", addr)
 	log.Println(http.ListenAndServe(addr, nil))
