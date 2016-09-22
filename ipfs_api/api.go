@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/ipfs/go-ipfs-api"
+	"github.com/streamrail/concurrent-map"
 	"net/http"
 )
 
@@ -15,6 +16,7 @@ type MyShell struct {
 	shell.Shell
 	Url    string
 	Client *http.Client
+	cache  cmap.ConcurrentMap
 }
 
 func reset() {
@@ -22,6 +24,7 @@ func reset() {
 		sh = &MyShell{
 			Url:    Addr,
 			Client: http.DefaultClient,
+			cache:  cmap.New(),
 		}
 		sh.Shell = *shell.NewShellWithClient(sh.Url, sh.Client)
 		if id, err := sh.ID(); err == nil {

@@ -68,6 +68,8 @@ func (l *loc) Seek(offset int64, whence int) (int64, error) {
 	return 0, webdav.ErrForbidden
 }
 
+const DetailedPropsLimit = 64
+
 func (l *loc) Readdir(count int) (ret []os.FileInfo, err error) {
 	ls, _ := ipfs_api.Shell().FileList(l.ch.Hash)
 	for _, lo := range ls.Links {
@@ -77,15 +79,19 @@ func (l *loc) Readdir(count int) (ret []os.FileInfo, err error) {
 		case "Directory":
 			if !strings.HasPrefix(lo.Name, "*") {
 				filepath := l.ch.Hash + "/" + lo.Name
-				tail := newChain(l.ch, filepath).tail()
+				tail := newChain(l.ch.clone(), filepath).tail()
 				var fi os.FileInfo
 				if tail.IsDir() {
 					_l := &loc{ch: tail}
-					_l.readPropsModel()
+					if len(ls.Links) <= DetailedPropsLimit {
+						_l.readPropsModel()
+					}
 					fi = _l
 				} else {
 					_f := &file{ch: tail}
-					_f.readPropsModel()
+					if len(ls.Links) <= DetailedPropsLimit {
+						_f.readPropsModel()
+					}
 					fi = _f
 				}
 				ret = append(ret, fi)
@@ -109,7 +115,7 @@ func (l *loc) readPropsModel() {
 	ls, _ := ipfs_api.Shell().FileList(l.ch.Hash)
 	pm := propLinksMap(ls)
 	if p, ok := pm["*"]; ok {
-		rd, _ := ipfs_api.Shell().Cat(p.Hash)
+		rd, _ := ipfs_api.Shell().CacheCat(p.Hash)
 		if el, err := dom.Decode(rd); err == nil {
 			l.props = el.Model()
 		} else {

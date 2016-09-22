@@ -16,6 +16,7 @@ import (
 var KV *diskv.Diskv
 
 func init() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	KV = diskv.New(diskv.Options{
 		BasePath: ".diskv",
 		Transform: func(s string) []string {

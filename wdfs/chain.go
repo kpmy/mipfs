@@ -41,10 +41,20 @@ func newChain(root *chain, filepath string) (ret *chain) {
 					}
 				}
 			} else {
-				Halt(100, root.name, err)
+				Halt(100, root.name, " ", err)
 			}
 		}
 	}
+	return
+}
+
+func (root *chain) clone() (ret *chain) {
+	Assert(root.down == nil, 21)
+	ret = &chain{}
+	ret.up = root.up
+	ret.upd = root.upd
+	ret.link = root.link
+	ret.UnixLsObject = root.UnixLsObject
 	return
 }
 
@@ -91,6 +101,7 @@ func (c *chain) Mode() os.FileMode {
 	} else if c.Type == "File" {
 		return 0
 	}
+	Halt(100, c.Type)
 	panic(100)
 }
 

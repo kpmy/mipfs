@@ -70,16 +70,6 @@ func (f *file) Sys() interface{} {
 	return nil
 }
 
-func (f *file) Close() error {
-	if f.wr != nil {
-		close(f.wr)
-		f.wg.Wait()
-	} else if !f.ch.exists() {
-		f.update(nil)
-	}
-	return nil
-}
-
 func (f *file) Read(p []byte) (n int, err error) {
 	if f.links == nil {
 		f.links, _ = ipfs_api.Shell().List(f.ch.Hash)
@@ -145,6 +135,16 @@ func (f *file) Stat() (os.FileInfo, error) {
 
 const emptyFileHash = "QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"
 
+func (f *file) Close() error {
+	if f.wr != nil {
+		close(f.wr)
+		f.wg.Wait()
+	} else if !f.ch.exists() {
+		f.update(nil)
+	}
+	return nil
+}
+
 func (f *file) update(data io.ReadCloser) {
 	if !fn.IsNil(data) {
 		f.ch.Hash, _ = ipfs_api.Shell().Add(data)
@@ -165,17 +165,34 @@ func (f *file) update(data io.ReadCloser) {
 	head.link.update(head.Hash)
 }
 
+const BufferLimit = 1024 * 128
+
+type ioFile interface {
+	io.Seeker
+	io.ReadCloser
+	io.Writer
+}
+
 func (f *file) Write(p []byte) (n int, err error) {
 	if f.wr == nil {
 		f.wr = make(chan *block, 16)
 		f.wg = new(sync.WaitGroup)
 		f.wg.Add(1)
 		go func(f *file) {
-			tmp, _ := ioutil.TempFile(os.TempDir(), "mipfs")
+			var tmp ioFile
+			buf := filebuffer.New(nil)
+			tmp = buf
 			for w := range f.wr {
 				tmp.Seek(w.pos, io.SeekStart)
 				w.data.Seek(0, io.SeekStart)
 				io.Copy(tmp, w.data)
+				if !fn.IsNil(buf) && buf.Buff.Len() > BufferLimit {
+					tf, _ := ioutil.TempFile(os.TempDir(), "mipfs")
+					buf.Seek(0, io.SeekStart)
+					io.Copy(tf, buf)
+					tmp = tf
+					buf = nil
+				}
 			}
 			tmp.Seek(0, io.SeekStart)
 			f.update(tmp)
@@ -195,7 +212,7 @@ func (f *file) readPropsModel() {
 		ls, _ := ipfs_api.Shell().FileList(f.ch.up.Hash)
 		pm := propLinksMap(ls)
 		if p, ok := pm[f.ch.name]; ok {
-			rd, _ := ipfs_api.Shell().Cat(p.Hash)
+			rd, _ := ipfs_api.Shell().CacheCat(p.Hash)
 			if el, err := dom.Decode(rd); err == nil {
 				f.props = el.Model()
 			} else {
