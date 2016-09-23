@@ -34,8 +34,11 @@ func main() {
 	}
 
 	log.Println("ipfs api at", ipfs_api.Addr)
-	Assert(ipfs_api.Shell().Pin(wdfs.EmptyDirHash) == nil && ipfs_api.Shell().Pin(wdfs.EmptyFileHash) == nil, 40)
-
+	if _, err := ipfs_api.Shell().ID(); err == nil {
+		Assert(ipfs_api.Shell().Pin(wdfs.EmptyDirHash) == nil && ipfs_api.Shell().Pin(wdfs.EmptyFileHash) == nil, 40)
+	} else {
+		log.Fatal(err)
+	}
 	dav := handler()
 	http.Handle("/ipfs/", dav)
 	http.Handle("/ipfs", dav)
