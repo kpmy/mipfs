@@ -20,7 +20,7 @@ type MyShell struct {
 }
 
 func reset() {
-	if sh == nil || !sh.IsUp(){
+	if sh == nil || !sh.IsUp() {
 		sh = &MyShell{
 			Url:    Addr,
 			Client: http.DefaultClient,
@@ -31,7 +31,7 @@ func reset() {
 			v0, _, _ := sh.Version()
 			log.Println("ipfs version", v0, "node", id.ID, "online")
 		} else {
-			log.Fatal(err)
+			log.Fatal("ipfs", err)
 			sh = nil
 		}
 	}

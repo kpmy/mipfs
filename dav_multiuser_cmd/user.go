@@ -21,7 +21,7 @@ func regHandler() http.Handler {
 		if err := req.DecodeJsonPayload(user); err == nil {
 			if user.Login != "" && user.Password != "" {
 				if _, err := KV.Read(user.Login); err != nil {
-					pwd, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+					pwd, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.MinCost)
 					KV.Write(zbase32.EncodeToString([]byte(user.Login)), pwd)
 				} else {
 					rest.Error(resp, "wrong user", 400)
