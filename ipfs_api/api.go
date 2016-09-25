@@ -4,6 +4,8 @@ import (
 	"log"
 
 	"github.com/ipfs/go-ipfs-api"
+	"github.com/jbenet/go-multiaddr"
+	"github.com/jbenet/go-multiaddr-net"
 	"github.com/streamrail/concurrent-map"
 	"net/http"
 )
@@ -21,8 +23,15 @@ type MyShell struct {
 
 func reset() {
 	if sh == nil || !sh.IsUp() {
+		u := Addr
+		if a, err := multiaddr.NewMultiaddr(u); err == nil {
+			_, host, err := manet.DialArgs(a)
+			if err == nil {
+				u = host
+			}
+		}
 		sh = &MyShell{
-			Url:    Addr,
+			Url:    u,
 			Client: http.DefaultClient,
 			cache:  cmap.New(),
 		}
