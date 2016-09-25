@@ -4,8 +4,8 @@ import (
 	"log"
 
 	"github.com/ipfs/go-ipfs-api"
-	"github.com/jbenet/go-multiaddr"
-	"github.com/jbenet/go-multiaddr-net"
+	"github.com/multiformats/go-multiaddr"
+	"github.com/multiformats/go-multiaddr-net"
 	"github.com/streamrail/concurrent-map"
 	"net/http"
 )

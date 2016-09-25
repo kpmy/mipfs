@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/ipfs/go-ipfs-api"
-	ma "github.com/jbenet/go-multiaddr"
-	manet "github.com/jbenet/go-multiaddr-net"
 	"github.com/kpmy/ypk/fn"
+	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr-net"
 )
 
 func TestRefsLocal(t *testing.T) {
