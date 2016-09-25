@@ -34,6 +34,8 @@ type pin struct {
 	pin  bool
 }
 
+var importantHash map[string]string = map[string]string{wdfs.EmptyDirHash: "empty unixfs dir", wdfs.EmptyFileHash: "empty unixfs file"}
+
 func writeRoot(ch chan string, user string) {
 	pinCh := make(chan pin, 1024)
 	go func() {
@@ -41,7 +43,7 @@ func writeRoot(ch chan string, user string) {
 			if p.pin {
 				ipfs_api.Shell().Pin(p.hash)
 				log.Println("pin", p.hash)
-			} else {
+			} else if _, ok := importantHash[p.hash]; !ok {
 				ipfs_api.Shell().Unpin(p.hash)
 				log.Println("unpin", p.hash)
 			}
