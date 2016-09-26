@@ -6,6 +6,7 @@ import (
 	"github.com/abbot/go-http-auth"
 	"github.com/kpmy/mipfs/ipfs_api"
 	"github.com/kpmy/mipfs/wdfs"
+	"github.com/kpmy/mipfs/wdfs/projection"
 	. "github.com/kpmy/ypk/tc"
 	"github.com/streamrail/concurrent-map"
 	"github.com/tv42/zbase32"
@@ -42,10 +43,10 @@ func writeRoot(ch chan string, user string) {
 		for p := range pinCh {
 			if p.pin {
 				ipfs_api.Shell().Pin(p.hash)
-				log.Println("pin", p.hash)
+				//log.Println("pin", p.hash)
 			} else if _, ok := importantHash[p.hash]; !ok {
 				ipfs_api.Shell().Unpin(p.hash)
-				log.Println("unpin", p.hash)
+				//log.Println("unpin", p.hash)
 			}
 		}
 	}()
@@ -114,15 +115,13 @@ func handler() http.Handler {
 				KV.Write(user+".root", []byte(defaultRoot))
 			}
 			rm.Set(user+".root", defaultRoot)
-			fs := wdfs.NewFS(func() string {
+			fl.fs, fl.ls = projection.NewPS(func() string {
 				r, _ := rm.Get(user + ".root")
 				return r.(string)
 			}, func(hash string) {
 				rm.Set(user+".root", hash)
 				rootWr <- hash
-			})
-			fl.fs = fs
-			fl.ls = wdfs.NewLS(fs)
+			}, projection.Active)
 			fl.dav = &webdav.Handler{
 				Prefix:     "/ipfs",
 				FileSystem: fl.fs,
