@@ -1,9 +1,9 @@
-package projection //import "github.com/kpmy/mipfs/wdfs/projection"
+package projection //import "github.com/kpmy/mipfs/dav_ipfs/projection"
 
 import (
 	"fmt"
+	"github.com/kpmy/mipfs/dav_ipfs"
 	"github.com/kpmy/mipfs/ipfs_api"
-	"github.com/kpmy/mipfs/wdfs"
 	"github.com/streamrail/concurrent-map"
 	"golang.org/x/net/webdav"
 	"io"
@@ -259,8 +259,8 @@ func NewPS(get func() string, set func(string), active bool) (fs webdav.FileSyst
 			pr.root = hash
 			set(hash)
 		}
-		xs := wdfs.NewFS(pr.get, pr.set)
-		ls = wdfs.NewLS(xs)
+		xs := dav_ipfs.NewFS(pr.get, pr.set)
+		ls = dav_ipfs.NewLS(xs)
 		pr.inner = xs
 
 		pr.cache = cmap.New()
@@ -270,8 +270,8 @@ func NewPS(get func() string, set func(string), active bool) (fs webdav.FileSyst
 
 		fs = pr
 	} else {
-		xs := wdfs.NewFS(get, set)
-		ls = wdfs.NewLS(xs)
+		xs := dav_ipfs.NewFS(get, set)
+		ls = dav_ipfs.NewLS(xs)
 		fs = xs
 	}
 	return

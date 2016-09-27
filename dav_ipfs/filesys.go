@@ -1,4 +1,4 @@
-package wdfs
+package dav_ipfs
 
 import (
 	"fmt"

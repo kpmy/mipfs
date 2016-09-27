@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"github.com/abbot/go-http-auth"
+	"github.com/kpmy/mipfs/dav_ipfs"
+	"github.com/kpmy/mipfs/dav_ipfs/projection"
 	"github.com/kpmy/mipfs/ipfs_api"
-	"github.com/kpmy/mipfs/wdfs"
-	"github.com/kpmy/mipfs/wdfs/projection"
 	. "github.com/kpmy/ypk/tc"
 	"github.com/streamrail/concurrent-map"
 	"github.com/tv42/zbase32"
@@ -35,7 +35,7 @@ type pin struct {
 	pin  bool
 }
 
-var importantHash map[string]string = map[string]string{wdfs.EmptyDirHash: "empty unixfs dir", wdfs.EmptyFileHash: "empty unixfs file"}
+var importantHash map[string]string = map[string]string{dav_ipfs.EmptyDirHash: "empty unixfs dir", dav_ipfs.EmptyFileHash: "empty unixfs file"}
 
 func writeRoot(ch chan string, user string) {
 	pinCh := make(chan pin, 1024)
@@ -96,20 +96,20 @@ func handler() http.Handler {
 			rootWr := make(chan string, 1024)
 			go writeRoot(rootWr, user)
 
-			defaultRoot := wdfs.EmptyDirHash
+			defaultRoot := dav_ipfs.EmptyDirHash
 			if r, err := KV.Read(user + ".root"); err == nil && len(r) > 0 {
 				defaultRoot = string(r)
 				found := make(chan string)
 				go func() {
 					if _, err := ipfs_api.Shell().BlockGet(defaultRoot); err != nil {
-						defaultRoot = wdfs.EmptyDirHash
+						defaultRoot = dav_ipfs.EmptyDirHash
 					}
 					found <- defaultRoot
 				}()
 				select {
 				case <-found:
 				case <-time.After(10 * time.Second):
-					defaultRoot = wdfs.EmptyDirHash
+					defaultRoot = dav_ipfs.EmptyDirHash
 				}
 			} else {
 				KV.Write(user+".root", []byte(defaultRoot))

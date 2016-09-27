@@ -2,8 +2,8 @@ package main
 
 import (
 	"github.com/abbot/go-http-auth"
+	"github.com/kpmy/mipfs/dav_ipfs"
 	"github.com/kpmy/mipfs/ipfs_api"
-	"github.com/kpmy/mipfs/wdfs"
 	. "github.com/kpmy/ypk/tc"
 	"github.com/peterbourgon/diskv"
 	"github.com/tv42/zbase32"
@@ -35,7 +35,7 @@ func main() {
 
 	log.Println("ipfs api at", ipfs_api.Addr)
 	if _, err := ipfs_api.Shell().ID(); err == nil {
-		Assert(ipfs_api.Shell().Pin(wdfs.EmptyDirHash) == nil && ipfs_api.Shell().Pin(wdfs.EmptyFileHash) == nil, 40)
+		Assert(ipfs_api.Shell().Pin(dav_ipfs.EmptyDirHash) == nil && ipfs_api.Shell().Pin(dav_ipfs.EmptyFileHash) == nil, 40)
 	} else {
 		log.Fatal(err)
 	}

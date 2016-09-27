@@ -1,4 +1,4 @@
-package projection
+package projection //import "github.com/kpmy/mipfs/dav_ipfs/projection"
 
 import "strings"
 
