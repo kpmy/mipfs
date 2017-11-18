@@ -1,6 +1,7 @@
 package projection //import "github.com/kpmy/mipfs/dav_ipfs/projection"
 
 import (
+	"context"
 	"fmt"
 	"github.com/kpmy/mipfs/dav_ipfs"
 	"github.com/kpmy/mipfs/ipfs_api"
@@ -177,20 +178,20 @@ func isProjection(split []string) bool {
 	return strings.ToLower(split[0]) == ProjectionRoot
 }
 
-func (p *projection) Mkdir(name string, perm os.FileMode) (err error) {
+func (p *projection) Mkdir(ctx context.Context, name string, perm os.FileMode) (err error) {
 	ls := splitPath(name)
 	switch {
 	case len(ls) > 1 && isProjection(ls):
 		err = os.ErrPermission
 	case len(ls) == 1 && isProjection(ls):
-		err = p.inner.Mkdir(strings.ToLower(name), perm)
+		err = p.inner.Mkdir(ctx, strings.ToLower(name), perm)
 	default:
-		err = p.inner.Mkdir(name, perm)
+		err = p.inner.Mkdir(ctx, name, perm)
 	}
 	return
 }
 
-func (p *projection) OpenFile(name string, flag int, perm os.FileMode) (ret webdav.File, err error) {
+func (p *projection) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (ret webdav.File, err error) {
 	log.Println("open", name)
 	ls := splitPath(name)
 	switch {
@@ -208,41 +209,41 @@ func (p *projection) OpenFile(name string, flag int, perm os.FileMode) (ret webd
 			err = os.ErrNotExist
 		}
 	default:
-		ret, err = p.inner.OpenFile(name, flag, perm)
+		ret, err = p.inner.OpenFile(ctx, name, flag, perm)
 	}
 	return
 }
 
-func (p *projection) RemoveAll(name string) (err error) {
+func (p *projection) RemoveAll(ctx context.Context, name string) (err error) {
 	ls := splitPath(name)
 	switch {
 	case isProjection(ls):
 		err = os.ErrPermission
 	default:
-		err = p.inner.RemoveAll(name)
+		err = p.inner.RemoveAll(ctx, name)
 	}
 	return
 }
 
-func (p *projection) Rename(oldName, newName string) (err error) {
+func (p *projection) Rename(ctx context.Context, oldName, newName string) (err error) {
 	ls := splitPath(oldName)
 	switch {
 	case isProjection(ls):
 		err = os.ErrPermission
 	default:
-		err = p.inner.Rename(oldName, newName)
+		err = p.inner.Rename(ctx, oldName, newName)
 	}
 	return
 }
 
-func (p *projection) Stat(name string) (fi os.FileInfo, err error) {
+func (p *projection) Stat(ctx context.Context, name string) (fi os.FileInfo, err error) {
 	log.Println("stat", name)
 	ls := splitPath(name)
 	switch {
 	case isProjection(ls):
 		fi = &cat{}
 	default:
-		fi, err = p.inner.Stat(name)
+		fi, err = p.inner.Stat(ctx, name)
 	}
 	return
 }

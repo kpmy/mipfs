@@ -3,11 +3,13 @@ package ipfs_api
 import (
 	"encoding/json"
 
+	"context"
 	"github.com/ipfs/go-ipfs-api"
 )
 
 func (s *MyShell) LocalRefs() (<-chan string, error) {
-	req := shell.NewRequest(s.Url, "refs/local")
+	ctx := context.Background()
+	req := shell.NewRequest(ctx, s.Url, "refs/local")
 
 	resp, err := req.Send(s.Client)
 	if err != nil {

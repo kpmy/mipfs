@@ -5,8 +5,9 @@ import (
 	"io"
 	"io/ioutil"
 
+	"context"
 	"github.com/ipfs/go-ipfs-api"
-	files "github.com/whyrusleeping/go-multipart-files"
+	"github.com/whyrusleeping/go-multipart-files"
 )
 
 type object struct {
@@ -26,8 +27,8 @@ func (s *MyShell) Add(r io.Reader) (string, error) {
 	fr := files.NewReaderFile("", "", rc, nil)
 	slf := files.NewSliceFile("", "", []files.File{fr})
 	fileReader := files.NewMultiFileReader(slf, true)
-
-	req := shell.NewRequest(s.Url, "add")
+	ctx := context.Background()
+	req := shell.NewRequest(ctx, s.Url, "add")
 	req.Body = fileReader
 	req.Opts["progress"] = "false"
 	req.Opts["chunker"] = "size-1048576"

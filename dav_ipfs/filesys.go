@@ -1,6 +1,7 @@
 package dav_ipfs
 
 import (
+	"context"
 	"fmt"
 	"github.com/kpmy/mipfs/ipfs_api"
 	"github.com/kpmy/ypk/dom"
@@ -29,7 +30,7 @@ func (f *filesystem) root() *chain {
 	return f.rootLevel
 }
 
-func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
+func (f *filesystem) Mkdir(ctx context.Context, name string, perm os.FileMode) (err error) {
 	root := f.root()
 	chain := newChain(root.mirror(), root.Hash+"/"+strings.Trim(name, "/"))
 	if tail := chain.tail(); !tail.exists() {
@@ -63,7 +64,7 @@ func (f *filesystem) Mkdir(name string, perm os.FileMode) (err error) {
 	return
 }
 
-func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (ret webdav.File, err error) {
+func (f *filesystem) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (ret webdav.File, err error) {
 	//log.Println("open", name, flag, perm)
 	root := f.root()
 	path := newChain(root.mirror(), root.Hash+"/"+strings.Trim(name, "/"))
@@ -92,7 +93,7 @@ func (f *filesystem) OpenFile(name string, flag int, perm os.FileMode) (ret webd
 	return
 }
 
-func (f *filesystem) RemoveAll(name string) (err error) {
+func (f *filesystem) RemoveAll(ctx context.Context, name string) (err error) {
 	root := f.root()
 	chain := newChain(root.mirror(), root.Hash+"/"+strings.Trim(name, "/"))
 	if tail := chain.tail(); tail.exists() {
@@ -114,7 +115,7 @@ func (f *filesystem) RemoveAll(name string) (err error) {
 	return
 }
 
-func (f *filesystem) Rename(oldName, newName string) (err error) {
+func (f *filesystem) Rename(ctx context.Context, oldName, newName string) (err error) {
 	//log.Println("rename", oldName, newName)
 	root := f.root()
 	on := newChain(root.mirror(), root.Hash+"/"+strings.Trim(oldName, "/"))
@@ -158,7 +159,7 @@ func (f *filesystem) Rename(oldName, newName string) (err error) {
 	return
 }
 
-func (f *filesystem) Stat(name string) (fi os.FileInfo, err error) {
+func (f *filesystem) Stat(ctx context.Context, name string) (fi os.FileInfo, err error) {
 	//log.Println("stat", name)
 	root := f.root()
 	chain := newChain(root.mirror(), root.Hash+"/"+strings.Trim(name, "/"))
@@ -183,7 +184,8 @@ func (f *filesystem) String() string {
 
 func (f *filesystem) ETag(name string) (ret string, err error) {
 	var fi os.FileInfo
-	if fi, err = f.Stat(name); err == nil {
+	ctx := context.Background()
+	if fi, err = f.Stat(ctx, name); err == nil {
 		ret = fmt.Sprintf(`"%x%x"`, fi.ModTime().UnixNano(), fi.Size())
 	}
 	return
