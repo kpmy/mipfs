@@ -1,4 +1,4 @@
-FROM golang:1.7
+FROM golang:1.9
 RUN mkdir -p /go/src/github.com/kpmy/mipfs
 COPY . /go/src/github.com/kpmy/mipfs
 ENV GOPATH /go
