@@ -40,7 +40,7 @@ func reset() {
 			v0, _, _ := sh.Version()
 			log.Println("ipfs version", v0, "node", id.ID, "online")
 		} else {
-			log.Fatal("ipfs", err)
+			log.Println("ipfs", err)
 			sh = nil
 		}
 	}
