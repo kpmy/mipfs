@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const EmptyDirHash = "QmdniF66q5wYDEyp2PYp6wXwgTUg3ssmb8NYSyfytwyf2j"
+const EmptyDirHash = "QmUNLLsPACCz1vLxQVkXqqLX5R1X345qqfHbsf67hvA3Nn"
 const EmptyFileHash = "QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH"
 
 type filesystem struct {
