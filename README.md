@@ -1,3 +1,7 @@
+# DEPRECATED
+
+This package is deprecated since IPFS ver. 0.4.3 (i guess), because developers of IPFS had changed the semantics of /add method, that doesn't accept file body anymore.
+
 # mipfs (middleware for ipfs)
 
 install ipfs
